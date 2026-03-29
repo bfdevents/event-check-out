@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BFD Shanghai 26 Check-In</title>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  text-align: center;
+  margin-top: 50px;
+  background-color: #f9f9f9;
+}
+
+.logo {
+  max-width: 150px;
+  margin-bottom: 20px;
+}
+
+h1 {
+  color: #2c3e50;
+}
+
+h2 {
+  color: #2c3e50;
+}
+
+p {
+  color: #555;
+}
+
+input, button {
+  padding: 10px;
+  margin: 10px 0;
+  width: 220px;
+  font-size: 16px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+button {
+  background-color: #3498db;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: #2980b9;
+}
+
+#status {
+  margin-top: 20px;
+  color: green;
+  font-weight: bold;
+}
+
+#retry {
+  display: none;
+  padding: 8px 15px;
+  font-size: 14px;
+  margin-top: 10px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- Logo -->
+<img class="logo" src="https://242329549.fs1.hubspotusercontent-na2.net/hubfs/242329549/crm-properties-file-values/Shanghai%20Final%20Logo.png" alt="BFD Shanghai 26 Logo">
+
+<h1>BFD Shanghai 26 Check-In</h1>
+<h2>Day 1: April 11, 2026</h2>
+<p>Please enter your name as it appears on your name badge.<br>Tap Continue, then allow location access when prompted to complete your check-in.</p>
+
+<form id="checkinForm">
+  <input type="text" id="firstname" placeholder="First Name" required />
+  <input type="text" id="lastname" placeholder="Last Name" required />
+  <br>
+  <button type="submit">Continue</button>
+</form>
+
+<button id="retry">Retry GPS</button>
+<p id="status"></p>
+
+<script>
+const venueLat = 31.1436; // Replace with your venue latitude
+const venueLon = 121.6625; // Replace with your venue longitude
+const allowedRadius = 0.03; // km (100 meters)
+const webhookURL = "https://hook.eu1.make.com/pdz3obto9me2epspeq6iyq3yfjh5o1ou?event=shanghai&action=check-in"; // Replace with your Make webhook
+
+const form = document.getElementById('checkinForm');
+const status = document.getElementById('status');
+const retryBtn = document.getElementById('retry');
+
+form.addEventListener('submit', function(e) {
+  e.preventDefault();
+  startGPSCheck();
+});
+
+retryBtn.addEventListener('click', function() {
+  retryBtn.style.display = "none";
+  startGPSCheck();
+});
+
+function startGPSCheck() {
+  const name = document.getElementById('name').value.trim();
+  if (!name) { alert("Please enter your name."); return; }
+
+  status.textContent = "Checking location...";
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(success, fail, {enableHighAccuracy:true});
+  } else {
+    alert("Geolocation is not supported by your browser.");
+  }
+
+  function success(position) {
+    const lat = position.coords.latitude;
+    const lon = position.coords.longitude;
+    const distance = getDistanceFromLatLonInKm(lat, lon, venueLat, venueLon);
+
+    if (distance <= allowedRadius) {
+      status.textContent = "Location verified! Redirecting...";
+      fetch(webhookURL, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({name, latitude: lat, longitude: lon, timestamp: new Date().toISOString()})
+      }).then(() => {
+        // Show personalized confirmation message
+        document.body.innerHTML = `
+          <div style="text-align:center; margin-top:50px; font-family:Arial,sans-serif;">
+            <img src="https://242329549.fs1.hubspotusercontent-na2.net/hubfs/242329549/crm-properties-file-values/Shanghai%20Final%20Logo.png" style="max-width:200px; margin-bottom:20px;" alt="BFD Shanghai 26 Logo">
+            <h1 style="color:#27ae60;">Check-In Successful!</h1>
+            <p style="font-size:18px; color:#555;">Thank you, <strong>${name}</strong>, for checking in at BFD Shanghai 26.</p>
+            <p>Your attendance has been recorded.</p>
+            <button onclick="window.location.href='https://www.bfdshanghai26.com/'" 
+                    style="padding:12px 20px; font-size:16px; margin-top:20px; cursor:pointer; background-color:#8B0000; color:white; border:none; border-radius:5px; display:inline-block; min-width:300px; white-space:normal; word-wrap:break-word;">
+              Go to BFD Shanghai 26 Website
+            </button>
+          </div>
+        `;
+      }).catch(() => {
+        alert("Error sending data. Try again.");
+      });
+    } else {
+      alert("We couldn’t verify that you are at the event venue. Please ensure you are on-site and try again. If the issue persists, please reach out to BFD staff for assistance.");
+      retryBtn.style.display = "inline-block";
+    }
+  }
+
+  function fail() {
+    alert("We couldn’t access your location. Please enable location services and try again. If the issue persists, please reach out to BFD staff for assistance.");
+    retryBtn.style.display = "inline-block";
+    status.textContent = "";
+  }
+}
+
+// Haversine formula
+function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
+  const R = 6371;
+  const dLat = deg2rad(lat2-lat1);
+  const dLon = deg2rad(lon2-lon1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2)**2;
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return R*c;
+}
+
+function deg2rad(deg) { return deg * (Math.PI/180); }
+</script>
+
+</body>
+</html>
