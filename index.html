@@ -74,7 +74,7 @@ button:hover {
 <h2>Day 1: April 11, 2026</h2>
 <p>Please enter your name as it appears on your name badge.<br>Tap Continue, then allow location access when prompted to complete your check-out.</p>
 
-<form id="checkinForm">
+<form id="checkoutForm">
   <input type="text" id="fname" placeholder="First Name" required />
   <input type="text" id="lname" placeholder="Last Name" required />
   <br>
@@ -90,7 +90,7 @@ const venueLon = 121.6625; // Replace with your venue longitude
 const allowedRadius = 0.03; // km (100 meters)
 const webhookURL = "https://hook.eu1.make.com/pdz3obto9me2epspeq6iyq3yfjh5o1ou?event=shanghai&action=check-out&day=1"; // Replace with your Make webhook
 
-const form = document.getElementById('checkinForm');
+const form = document.getElementById('checkoutForm');
 const status = document.getElementById('status');
 const retryBtn = document.getElementById('retry');
 
@@ -105,8 +105,15 @@ retryBtn.addEventListener('click', function() {
 });
 
 function startGPSCheck() {
-  const name = document.getElementById('name').value.trim();
-  if (!name) { alert("Please enter your name."); return; }
+  const fname = document.getElementById('fname').value.trim();
+  const lname = document.getElementById('lname').value.trim();
+
+  if (!fname || !lname) {
+    alert("Please enter your name.");
+    return;
+  }
+
+  const name = `${fname} ${lname}`;
 
   status.textContent = "Checking location...";
 
@@ -132,8 +139,8 @@ function startGPSCheck() {
         document.body.innerHTML = `
           <div style="text-align:center; margin-top:50px; font-family:Arial,sans-serif;">
             <img src="https://242329549.fs1.hubspotusercontent-na2.net/hubfs/242329549/crm-properties-file-values/Shanghai%20Final%20Logo.png" style="max-width:200px; margin-bottom:20px;" alt="BFD Shanghai 26 Logo">
-            <h1 style="color:#27ae60;">Check-In Successful!</h1>
-            <p style="font-size:18px; color:#555;">Thank you, <strong>${name}</strong>, for checking in at BFD Shanghai 26.</p>
+            <h1 style="color:#27ae60;">End of Day Check Complete!</h1>
+            <p style="font-size:18px; color:#555;">Thank you, <strong>${name}</strong>, for attending BFD Shanghai 26 today. We hope you gained valuable insights and enjoyed your learning experience!</p>
             <p>Your attendance has been recorded.</p>
             <button onclick="window.location.href='https://www.bfdshanghai26.com/'" 
                     style="padding:12px 20px; font-size:16px; margin-top:20px; cursor:pointer; background-color:#8B0000; color:white; border:none; border-radius:5px; display:inline-block; min-width:300px; white-space:normal; word-wrap:break-word;">
