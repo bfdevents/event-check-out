@@ -18,17 +18,9 @@ body {
   margin-bottom: 20px;
 }
 
-h1 {
-  color: #2c3e50;
-}
-
-h2 {
-  color: #2c3e50;
-}
-
-p {
-  color: #555;
-}
+h1 { color: #2c3e50; }
+h2 { color: #2c3e50; }
+p { color: #555; }
 
 input, button {
   padding: 10px;
@@ -67,28 +59,36 @@ button:hover {
 
 <body>
 
-<!-- Logo -->
-<img class="logo" src="https://242329549.fs1.hubspotusercontent-na2.net/hubfs/242329549/crm-properties-file-values/Shanghai%20Final%20Logo.png" alt="BFD Shanghai 26 Logo">
+<!-- Paused Message -->
+<div id="paused" style="display:none; margin-top:50px;">
+  <h1>Day 1 session is temporarily paused</h1>
+  <p>Please come back shortly!</p>
+</div>
 
-<h1>BFD Shanghai 26 Check-Out</h1>
-<h2>Day 1: April 11, 2026</h2>
-<p>Please enter your name as it appears on your name badge.<br>Tap Continue, then allow location access when prompted to complete your check-out.</p>
+<!-- Main App -->
+<div id="app">
+  <img class="logo" src="https://242329549.fs1.hubspotusercontent-na2.net/hubfs/242329549/crm-properties-file-values/Shanghai%20Final%20Logo.png" alt="BFD Shanghai 26 Logo">
+  <h1>BFD Shanghai 26 Check-Out</h1>
+  <h2>Day 1: April 11, 2026</h2>
+  <p>Please enter your name as it appears on your name badge.<br>Tap Continue, then allow location access when prompted to complete your check-out.</p>
 
-<form id="checkoutForm">
-  <input type="text" id="fname" placeholder="First Name" required />
-  <input type="text" id="lname" placeholder="Last Name" required />
-  <br>
-  <button type="submit">Continue</button>
-</form>
+  <form id="checkoutForm">
+    <input type="text" id="fname" placeholder="First Name" required />
+    <input type="text" id="lname" placeholder="Last Name" required />
+    <br>
+    <button type="submit">Continue</button>
+  </form>
 
-<button id="retry">Retry GPS</button>
-<p id="status"></p>
+  <button id="retry">Retry GPS</button>
+  <p id="status"></p>
+</div>
 
 <script>
-const venueLat = 31.1436; // Replace with your venue latitude
-const venueLon = 121.6625; // Replace with your venue longitude
-const allowedRadius = 0.03; // km (100 meters)
-const webhookURL = "https://hook.eu1.make.com/pdz3obto9me2epspeq6iyq3yfjh5o1ou?event=shanghai&action=check-out&day=1"; // Replace with your Make webhook
+// Venue info
+const venueLat = 31.1436;
+const venueLon = 121.6625;
+const allowedRadius = 0.03; // km
+const webhookURL = "https://hook.eu1.make.com/pdz3obto9me2epspeq6iyq3yfjh5o1ou?event=shanghai&action=check-out&day=1";
 
 const form = document.getElementById('checkoutForm');
 const status = document.getElementById('status');
@@ -114,7 +114,6 @@ function startGPSCheck() {
   }
 
   const name = `${fname} ${lname}`;
-
   status.textContent = "Checking location...";
 
   if (navigator.geolocation) {
@@ -135,7 +134,6 @@ function startGPSCheck() {
         headers: {'Content-Type':'application/json'},
         body: JSON.stringify({fname, lname, latitude: lat, longitude: lon, timestamp: new Date().toISOString()})
       }).then(() => {
-        // Show personalized confirmation message
         document.body.innerHTML = `
           <div style="text-align:center; margin-top:50px; font-family:Arial,sans-serif;">
             <img src="https://242329549.fs1.hubspotusercontent-na2.net/hubfs/242329549/crm-properties-file-values/Shanghai%20Final%20Logo.png" style="max-width:200px; margin-bottom:20px;" alt="BFD Shanghai 26 Logo">
@@ -148,9 +146,7 @@ function startGPSCheck() {
             </button>
           </div>
         `;
-      }).catch(() => {
-        alert("Error sending data. Try again.");
-      });
+      }).catch(() => { alert("Error sending data. Try again."); });
     } else {
       alert("We couldn’t verify that you are at the event venue. Please ensure you are on-site and try again. If the issue persists, please reach out to BFD staff for assistance.");
       retryBtn.style.display = "inline-block";
@@ -173,8 +169,33 @@ function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
   const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
   return R*c;
 }
-
 function deg2rad(deg) { return deg * (Math.PI/180); }
+
+// -----------------------
+// Pause functionality
+// -----------------------
+const pauseStart = { hour: 13, minute: 20 }; // 1:20 PM
+const pauseEnd   = { hour: 13, minute: 30 }; // 1:30 PM
+
+function checkPaused() {
+  const now = new Date();
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const startMinutes = pauseStart.hour * 60 + pauseStart.minute;
+  const endMinutes = pauseEnd.hour * 60 + pauseEnd.minute;
+
+  if (nowMinutes >= startMinutes && nowMinutes < endMinutes) {
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('paused').style.display = 'block';
+  } else {
+    document.getElementById('app').style.display = 'block';
+    document.getElementById('paused').style.display = 'none';
+  }
+}
+
+// Run on page load
+checkPaused();
+// Recheck every 30 seconds
+setInterval(checkPaused, 30000);
 </script>
 
 </body>
