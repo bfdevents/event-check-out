@@ -177,9 +177,11 @@ function deg2rad(deg) { return deg * (Math.PI/180); }
 const pauseStart = { hour: 13, minute: 20 }; // 1:20 PM
 const pauseEnd   = { hour: 13, minute: 30 }; // 1:30 PM
 
-function checkPaused() {
+function checkPausedShanghai() {
   const now = new Date();
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const shanghaiTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
+  
+  const nowMinutes = shanghaiTime.getHours() * 60 + shanghaiTime.getMinutes();
   const startMinutes = pauseStart.hour * 60 + pauseStart.minute;
   const endMinutes = pauseEnd.hour * 60 + pauseEnd.minute;
 
@@ -193,9 +195,9 @@ function checkPaused() {
 }
 
 // Run on page load
-checkPaused();
+checkPausedShanghai();
 // Recheck every 30 seconds
-setInterval(checkPaused, 30000);
+setInterval(checkPausedShanghai, 30000);
 </script>
 
 </body>
