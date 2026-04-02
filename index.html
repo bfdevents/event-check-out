@@ -6,76 +6,26 @@
 <title>BFD Shanghai 26 Check-Out</title>
 
 <style>
-body {
-  font-family: Arial, sans-serif;
-  text-align: center;
-  margin-top: 50px;
-  background-color: #f9f9f9;
-}
-
-.logo {
-  max-width: 150px;
-  margin-bottom: 20px;
-}
-
-h1 { color: #2c3e50; }
-h2 { color: #2c3e50; }
-p { color: #555; }
-
-input, button {
-  padding: 10px;
-  margin: 10px 0;
-  width: 220px;
-  font-size: 16px;
-  border-radius: 5px;
-  border: 1px solid #ccc;
-}
-
-button {
-  background-color: #3498db;
-  color: white;
-  border: none;
-  cursor: pointer;
-}
-
-button:hover {
-  background-color: #2980b9;
-}
-
-#status {
-  margin-top: 20px;
-  color: green;
-  font-weight: bold;
-}
-
-#retry {
-  display: none;
-  padding: 8px 15px;
-  font-size: 14px;
-  margin-top: 10px;
-}
+body { font-family: Arial; text-align: center; margin-top: 50px; background:#f9f9f9; }
+.logo { max-width:150px; margin-bottom:20px; }
+input, button { padding:10px; margin:10px; width:220px; border-radius:5px; }
+button { background:#3498db; color:white; border:none; cursor:pointer; }
+#retry { display:none; }
 </style>
 </head>
 
 <body>
 
-<!-- Paused Message -->
-<div id="paused" style="display:none; margin-top:50px;">
-  <h1>Day 1 session is temporarily paused</h1>
-  <p>Please come back shortly!</p>
-</div>
+<div id="paused" style="display:none;"></div>
 
-<!-- Main App -->
 <div id="app">
-  <img class="logo" src="https://242329549.fs1.hubspotusercontent-na2.net/hubfs/242329549/crm-properties-file-values/Shanghai%20Final%20Logo.png" alt="BFD Shanghai 26 Logo">
-  <h1>BFD Shanghai 26 Check-Out</h1>
-  <h2>Day 1: April 11, 2026</h2>
-  <p>Please enter your name as it appears on your name badge.<br>Tap Continue, then allow location access when prompted to complete your check-out.</p>
+  <img class="logo" src="https://242329549.fs1.hubspotusercontent-na2.net/hubfs/242329549/crm-properties-file-values/Shanghai%20Final%20Logo.png">
+  <h1 id="title">BFD Shanghai 26 Check-Out</h1>
+  <h2 id="dayLabel"></h2>
 
-  <form id="checkoutForm">
-    <input type="text" id="fname" placeholder="First Name" required />
-    <input type="text" id="lname" placeholder="Last Name" required />
-    <br>
+  <form id="form">
+    <input type="text" id="fname" placeholder="First Name" required>
+    <input type="text" id="lname" placeholder="Last Name" required><br>
     <button type="submit">Continue</button>
   </form>
 
@@ -84,120 +34,145 @@ button:hover {
 </div>
 
 <script>
-// Venue info
-const venueLat = 14.359157;
-const venueLon = 120.887148;
-const allowedRadius = 0.03; // km
-const webhookURL = "https://hook.eu1.make.com/pdz3obto9me2epspeq6iyq3yfjh5o1ou?event=shanghai&action=check-out&day=1";
+// -----------------------
+// CONFIG
+// -----------------------
+const venueLat = 31.1436;
+const venueLon = 121.6625;
+const allowedRadius = 0.03;
+const webhookURL = "https://hook.eu1.make.com/YOUR_WEBHOOK";
 
-const form = document.getElementById('checkoutForm');
-const status = document.getElementById('status');
-const retryBtn = document.getElementById('retry');
+// -----------------------
+// TIME HELPERS
+// -----------------------
+function getShanghaiDate(offset=0){
+  const now = new Date();
+  const sh = new Date(now.toLocaleString("en-US",{timeZone:"Asia/Shanghai"}));
+  sh.setDate(sh.getDate()+offset);
+  return sh.toISOString().split("T")[0];
+}
 
-form.addEventListener('submit', function(e) {
-  e.preventDefault();
-  startGPSCheck();
-});
+// -----------------------
+// EVENT SCHEDULE
+// -----------------------
+const eventSchedule = [
+  { day:99,label:"Test Day (Today)",date:getShanghaiDate(0),start:{hour:0,minute:0},end:{hour:23,minute:59}},
+  { day:100,label:"Test Day (Tomorrow)",date:getShanghaiDate(1),start:{hour:0,minute:0},end:{hour:23,minute:59}},
+  { day:1,label:"Day 1",date:"2026-04-11",start:{hour:14,minute:0},end:{hour:18,minute:0}},
+  { day:2,label:"Day 2",date:"2026-04-12",start:{hour:14,minute:0},end:{hour:18,minute:0}},
+  { day:3,label:"Day 3",date:"2026-04-14",start:{hour:14,minute:0},end:{hour:18,minute:0}}
+];
 
-retryBtn.addEventListener('click', function() {
-  retryBtn.style.display = "none";
-  startGPSCheck();
-});
+let currentEvent=null;
 
-function startGPSCheck() {
-  const fname = document.getElementById('fname').value.trim();
-  const lname = document.getElementById('lname').value.trim();
+// -----------------------
+// ACCESS CONTROL
+// -----------------------
+function checkAccess(){
+  const now = new Date();
+  const sh = new Date(now.toLocaleString("en-US",{timeZone:"Asia/Shanghai"}));
 
-  if (!fname || !lname) {
-    alert("Please enter your name.");
-    return;
-  }
+  const today = sh.toISOString().split("T")[0];
+  const minutes = sh.getHours()*60+sh.getMinutes();
 
-  const name = `${fname} ${lname}`;
-  status.textContent = "Checking location...";
+  currentEvent = eventSchedule.find(e=>e.date===today);
 
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(success, fail, {enableHighAccuracy:true});
+  if(!currentEvent) return block("Not available today.");
+
+  const start = currentEvent.start.hour*60+currentEvent.start.minute;
+  const end = currentEvent.end.hour*60+currentEvent.end.minute;
+
+  if(minutes>=start && minutes<end){
+    document.getElementById("app").style.display="block";
+    document.getElementById("paused").style.display="none";
+    document.getElementById("dayLabel").textContent = `${currentEvent.label} - ${currentEvent.date}`;
+
+    if(currentEvent.day>=99){
+      document.getElementById("title").textContent += " (TEST)";
+    }
+
   } else {
-    alert("Geolocation is not supported by your browser.");
+    block(`Available ${formatTime(currentEvent.start)} - ${formatTime(currentEvent.end)}`);
   }
+}
 
-  function success(position) {
-    const lat = position.coords.latitude;
-    const lon = position.coords.longitude;
-    const distance = getDistanceFromLatLonInKm(lat, lon, venueLat, venueLon);
+function block(msg){
+  document.getElementById("app").style.display="none";
+  const p=document.getElementById("paused");
+  p.style.display="block";
+  p.innerHTML=`<h1>Check-Out Closed</h1><p>${msg}</p>`;
+}
 
-    if (distance <= allowedRadius) {
-      status.textContent = "Location verified! Redirecting...";
-      fetch(webhookURL, {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({fname, lname, latitude: lat, longitude: lon, timestamp: new Date().toISOString()})
-      }).then(() => {
-        document.body.innerHTML = `
-          <div style="text-align:center; margin-top:50px; font-family:Arial,sans-serif;">
-            <img src="https://242329549.fs1.hubspotusercontent-na2.net/hubfs/242329549/crm-properties-file-values/Shanghai%20Final%20Logo.png" style="max-width:200px; margin-bottom:20px;" alt="BFD Shanghai 26 Logo">
-            <h1 style="color:#27ae60;">End of Day Check Complete!</h1>
-            <p style="font-size:18px; color:#555;">Thank you, <strong>${name}</strong>, for attending BFD Shanghai 26 today. We hope you gained valuable insights and enjoyed your learning experience!</p>
-            <p>Your attendance has been recorded.</p>
-            <button onclick="window.location.href='https://www.bfdshanghai26.com/'" 
-                    style="padding:12px 20px; font-size:16px; margin-top:20px; cursor:pointer; background-color:#8B0000; color:white; border:none; border-radius:5px; display:inline-block; min-width:300px; white-space:normal; word-wrap:break-word;">
-              Go to BFD Shanghai 26 Website
-            </button>
-          </div>
-        `;
-      }).catch(() => { alert("Error sending data. Try again."); });
+function formatTime(t){
+  return `${String(t.hour).padStart(2,'0')}:${String(t.minute).padStart(2,'0')}`;
+}
+
+// -----------------------
+// GPS + SUBMIT
+// -----------------------
+const form=document.getElementById("form");
+const retry=document.getElementById("retry");
+const status=document.getElementById("status");
+
+form.addEventListener("submit",e=>{
+  e.preventDefault();
+  startGPS();
+});
+
+retry.onclick=()=>{ retry.style.display="none"; startGPS(); };
+
+function startGPS(){
+  const fname=fnameEl.value.trim();
+  const lname=lnameEl.value.trim();
+  if(!fname||!lname) return alert("Enter name");
+
+  status.textContent="Checking location...";
+
+  navigator.geolocation.getCurrentPosition(success,fail,{enableHighAccuracy:true});
+
+  function success(pos){
+    const lat=pos.coords.latitude;
+    const lon=pos.coords.longitude;
+
+    const dist=getDistance(lat,lon,venueLat,venueLon);
+
+    if(dist<=allowedRadius){
+      fetch(webhookURL,{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+          fname,lname,
+          day:currentEvent.day,
+          action:"check-out",
+          lat,lon,
+          timestamp:new Date().toISOString()
+        })
+      }).then(()=>{
+        document.body.innerHTML=`<h1>Check-Out Complete</h1><p>Thank you ${fname}!</p>`;
+      });
     } else {
-      alert("We couldn’t verify that you are at the event venue. Please ensure you are on-site and try again. If the issue persists, please reach out to BFD staff for assistance.");
-      retryBtn.style.display = "inline-block";
+      alert("Not in venue");
+      retry.style.display="inline-block";
     }
   }
 
-  function fail() {
-    alert("We couldn’t access your location. Please enable location services and try again. If the issue persists, please reach out to BFD staff for assistance.");
-    retryBtn.style.display = "inline-block";
-    status.textContent = "";
+  function fail(){
+    alert("Enable location");
+    retry.style.display="inline-block";
   }
 }
 
-// Haversine formula
-function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
-  const R = 6371;
-  const dLat = deg2rad(lat2-lat1);
-  const dLon = deg2rad(lon2-lon1);
-  const a = Math.sin(dLat/2)**2 + Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * Math.sin(dLon/2)**2;
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-  return R*c;
-}
-function deg2rad(deg) { return deg * (Math.PI/180); }
-
 // -----------------------
-// Pause functionality
-// -----------------------
-const pauseStart = { hour: 13, minute: 50 }; // 1:20 PM
-const pauseEnd   = { hour: 14, minute: 00 }; // 1:30 PM
-
-function checkPausedShanghai() {
-  const now = new Date();
-  const shanghaiTime = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
-  
-  const nowMinutes = shanghaiTime.getHours() * 60 + shanghaiTime.getMinutes();
-  const startMinutes = pauseStart.hour * 60 + pauseStart.minute;
-  const endMinutes = pauseEnd.hour * 60 + pauseEnd.minute;
-
-  if (nowMinutes >= startMinutes && nowMinutes < endMinutes) {
-    document.getElementById('app').style.display = 'none';
-    document.getElementById('paused').style.display = 'block';
-  } else {
-    document.getElementById('app').style.display = 'block';
-    document.getElementById('paused').style.display = 'none';
-  }
+function getDistance(lat1,lon1,lat2,lon2){
+  const R=6371;
+  const dLat=(lat2-lat1)*Math.PI/180;
+  const dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R*(2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
 }
 
-// Run on page load
-checkPausedShanghai();
-// Recheck every 30 seconds
-setInterval(checkPausedShanghai, 30000);
+checkAccess();
+setInterval(checkAccess,30000);
 </script>
 
 </body>
