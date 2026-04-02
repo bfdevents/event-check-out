@@ -43,27 +43,37 @@ const allowedRadius = 0.03;
 const webhookURL = "https://hook.eu1.make.com/YOUR_WEBHOOK";
 
 // -----------------------
-// TIME HELPERS
+// Helpers
 // -----------------------
-function getShanghaiDate(offset=0){
-  const now = new Date();
-  const sh = new Date(now.toLocaleString("en-US",{timeZone:"Asia/Shanghai"}));
-  sh.setDate(sh.getDate()+offset);
-  return sh.toISOString().split("T")[0];
+function formatTime(t){
+  return `${String(t.hour).padStart(2,'0')}:${String(t.minute).padStart(2,'0')}`;
+}
+
+function formatDatePretty(dateStr) {
+  const d = new Date(dateStr);
+  return d.toLocaleDateString("en-US", { month:"short", day:"2-digit", year:"numeric" }).replace(",", "");
+}
+
+// Haversine formula
+function getDistance(lat1,lon1,lat2,lon2){
+  const R=6371;
+  const dLat=(lat2-lat1)*Math.PI/180;
+  const dLon=(lon2-lon1)*Math.PI/180;
+  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
+  return R*(2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
 }
 
 // -----------------------
-// EVENT SCHEDULE
+// EVENT SCHEDULE (Actual + Test Day)
 // -----------------------
 const eventSchedule = [
-  { day:99,label:"Test Today",date:getShanghaiDate(0),start:{hour:10,minute:30},end:{hour:10,minute:35}},
-  { day:100,label:"Test Day (Tomorrow)",date:getShanghaiDate(1),start:{hour:0,minute:0},end:{hour:23,minute:59}},
-  { day:1,label:"Day 1",date:"2026-04-11",start:{hour:14,minute:0},end:{hour:18,minute:0}},
-  { day:2,label:"Day 2",date:"2026-04-12",start:{hour:14,minute:0},end:{hour:18,minute:0}},
-  { day:3,label:"Day 3",date:"2026-04-14",start:{hour:14,minute:0},end:{hour:18,minute:0}}
+  { day: 0, label:"Day 0", date:"2026-04-02", start:{hour:14,minute:0}, end:{hour:18,minute:0} }, // Test day
+  { day: 1, label:"Day 1", date:"2026-04-11", start:{hour:14,minute:0}, end:{hour:18,minute:0} },
+  { day: 2, label:"Day 2", date:"2026-04-12", start:{hour:14,minute:0}, end:{hour:18,minute:0} },
+  { day: 3, label:"Day 3", date:"2026-04-14", start:{hour:14,minute:0}, end:{hour:18,minute:0} }
 ];
 
-let currentEvent=null;
+let currentEvent = null;
 
 // -----------------------
 // ACCESS CONTROL
@@ -73,24 +83,26 @@ function checkAccess(){
   const sh = new Date(now.toLocaleString("en-US",{timeZone:"Asia/Shanghai"}));
 
   const today = sh.toISOString().split("T")[0];
-  const minutes = sh.getHours()*60+sh.getMinutes();
+  const minutes = sh.getHours()*60 + sh.getMinutes();
 
-  currentEvent = eventSchedule.find(e=>e.date===today);
+  currentEvent = eventSchedule.find(e => e.date === today);
 
-  if(!currentEvent) return block("Not available today.");
+  if(!currentEvent){
+    block("Check-Out not available today.");
+    return;
+  }
 
-  const start = currentEvent.start.hour*60+currentEvent.start.minute;
-  const end = currentEvent.end.hour*60+currentEvent.end.minute;
+  const start = currentEvent.start.hour*60 + currentEvent.start.minute;
+  const end = currentEvent.end.hour*60 + currentEvent.end.minute;
 
-  if(minutes>=start && minutes<end){
+  if(minutes >= start && minutes < end){
     document.getElementById("app").style.display="block";
     document.getElementById("paused").style.display="none";
-    document.getElementById("dayLabel").textContent = `${currentEvent.label} - ${currentEvent.date}`;
 
-    if(currentEvent.day>=99){
-      document.getElementById("title").textContent += " (TEST)";
-    }
-
+    // Only show label if it exists (skip empty label for Apr 2)
+    const labelText = currentEvent.label ? `${currentEvent.label} - ` : "";
+    document.getElementById("dayLabel").textContent =
+      `${labelText}${formatDatePretty(currentEvent.date)}`;
   } else {
     block(`Available ${formatTime(currentEvent.start)} - ${formatTime(currentEvent.end)}`);
   }
@@ -103,85 +115,64 @@ function block(msg){
   p.innerHTML=`<h1>Check-Out Closed</h1><p>${msg}</p>`;
 }
 
-function formatTime(t){
-  return `${String(t.hour).padStart(2,'0')}:${String(t.minute).padStart(2,'0')}`;
-}
-
-function formatDatePretty(dateStr) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "2-digit",
-    year: "numeric"
-  });
-}
-
 // -----------------------
 // GPS + SUBMIT
 // -----------------------
-const form=document.getElementById("form");
-const retry=document.getElementById("retry");
-const status=document.getElementById("status");
+const form = document.getElementById("form");
+const retry = document.getElementById("retry");
+const status = document.getElementById("status");
+const fnameEl = document.getElementById("fname");
+const lnameEl = document.getElementById("lname");
 
-form.addEventListener("submit",e=>{
-  e.preventDefault();
-  startGPS();
-});
-
-retry.onclick=()=>{ retry.style.display="none"; startGPS(); };
+form.addEventListener("submit", e => { e.preventDefault(); startGPS(); });
+retry.onclick = () => { retry.style.display="none"; startGPS(); };
 
 function startGPS(){
-  const fname=fnameEl.value.trim();
-  const lname=lnameEl.value.trim();
-  if(!fname||!lname) return alert("Enter name");
+  const fname = fnameEl.value.trim();
+  const lname = lnameEl.value.trim();
+  if(!fname || !lname){ alert("Enter name"); return; }
 
-  status.textContent="Checking location...";
+  status.textContent = "Checking location...";
 
-  navigator.geolocation.getCurrentPosition(success,fail,{enableHighAccuracy:true});
+  navigator.geolocation.getCurrentPosition(success, fail, {enableHighAccuracy:true});
 
   function success(pos){
-    const lat=pos.coords.latitude;
-    const lon=pos.coords.longitude;
+    const lat = pos.coords.latitude;
+    const lon = pos.coords.longitude;
+    const dist = getDistance(lat, lon, venueLat, venueLon);
 
-    const dist=getDistance(lat,lon,venueLat,venueLon);
-
-    if(dist<=allowedRadius){
+    if(dist <= allowedRadius){
       fetch(webhookURL,{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({
-          fname,lname,
-          day:currentEvent.day,
-          action:"check-out",
-          lat,lon,
-          timestamp:new Date().toISOString()
+        body: JSON.stringify({
+          fname, lname,
+          day: currentEvent.day,
+          action: "check-out",
+          lat, lon,
+          timestamp: new Date().toISOString()
         })
       }).then(()=>{
-        document.body.innerHTML=`<h1>Check-Out Complete</h1><p>Thank you ${fname}!</p>`;
-      });
+        document.body.innerHTML = `
+          <h1>Check-Out Complete</h1>
+          <p>Thank you ${fname} ${lname}!</p>
+        `;
+      }).catch(()=>{ alert("Error sending data. Try again."); });
     } else {
-      alert("Not in venue");
-      retry.style.display="inline-block";
+      alert("We couldn’t verify that you are at the event venue.");
+      retry.style.display = "inline-block";
     }
   }
 
   function fail(){
-    alert("Enable location");
-    retry.style.display="inline-block";
+    alert("Enable location services and try again.");
+    retry.style.display = "inline-block";
   }
 }
 
 // -----------------------
-function getDistance(lat1,lon1,lat2,lon2){
-  const R=6371;
-  const dLat=(lat2-lat1)*Math.PI/180;
-  const dLon=(lon2-lon1)*Math.PI/180;
-  const a=Math.sin(dLat/2)**2+Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2)**2;
-  return R*(2*Math.atan2(Math.sqrt(a),Math.sqrt(1-a)));
-}
-
 checkAccess();
-setInterval(checkAccess,30000);
+setInterval(checkAccess, 30000);
 </script>
 
 </body>
