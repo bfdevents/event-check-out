@@ -77,7 +77,7 @@ function checkAccess(){
         document.getElementById("app").style.display="block";
         document.getElementById("paused").style.display="none";
     } else {
-        block(`Available ${formatTime(start)} - ${formatTime(end)} (Shanghai Time)`);
+        block(`Available on ${currentEvent.date}, ${formatTime(start)} - ${formatTime(end)} (Shanghai Time)`);
     }
 }
 
