@@ -19,8 +19,9 @@ button { background:#3498db; color:white; border:none; cursor:pointer; }
 
 <div id="app">
   <img class="logo" src="https://242329549.fs1.hubspotusercontent-na2.net/hubfs/242329549/crm-properties-file-values/Shanghai%20Final%20Logo.png">
+
   <h1>BFD Shanghai 26 Check-Out</h1>
-  <h2>April 11, 2026</h2>
+  <h2 id="eventTitle">April 11, 2026</h2>
 
   <form id="form">
     <input type="text" id="fname" placeholder="First Name" required>
@@ -32,20 +33,24 @@ button { background:#3498db; color:white; border:none; cursor:pointer; }
 </div>
 
 <script>
-// -----------------------
+// =======================
+// CONFIG
+// =======================
 const webhookURL = "https://hook.eu1.make.com/pdz3obto9me2epspeq6iyq3yfjh5o1ou";
 
-// -----------------------
-// SCHEDULE (SHANGHAI TIME)
-// -----------------------
-const eventSchedule = [
-  { day: 1, date:"2026-04-11", start:{hour:7,minute:0}, end:{hour:14,minute:0} },
-  { day: 2, date:"2026-04-12", start:{hour:0,minute:0}, end:{hour:14,minute:0} }
-];
+// =======================
+// SINGLE EVENT (EDIT ONLY THIS)
+// =======================
+const event = {
+    day: 1,
+    date: "2026-04-11",
+    start: { hour: 7, minute: 0 },
+    end: { hour: 14, minute: 0 }
+};
 
-let currentEvent = null;
-
-// -----------------------
+// =======================
+// SHANGHAI TIME HELPERS
+// =======================
 function getShanghaiNow(){
     return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Shanghai" }));
 }
@@ -58,37 +63,12 @@ function getMinutes(d){
     return d.getHours()*60 + d.getMinutes();
 }
 
-// -----------------------
-function checkAccess(){
-    const sh = getShanghaiNow();
-    const today = getShanghaiDateString(sh);
-    const minutes = getMinutes(sh);
-
-    currentEvent = eventSchedule.find(e => e.date === today);
-
-    if(!currentEvent){
-
-    // find next upcoming event
-    const sh = getShanghaiNow();
-
-    const upcoming = eventSchedule
-        .map(e => {
-            const eventDateTime = new Date(`${e.date}T${String(e.start.hour).padStart(2,'0')}:${String(e.start.minute).padStart(2,'0')}:00`);
-            return { ...e, dateTime: eventDateTime };
-        })
-        .filter(e => e.dateTime > sh)
-        .sort((a,b) => a.dateTime - b.dateTime)[0];
-
-    if(upcoming){
-        const start = upcoming.start.hour*60 + upcoming.start.minute;
-        const end = upcoming.end.hour*60 + upcoming.end.minute;
-
-        block(`Check-in will be available on ${formatDate(upcoming.date)} from ${formatTime(start)} to ${formatTime(end)} (Shanghai Time).`);
-    } else {
-        block("Check-in is now closed. Thank you!");
-    }
-
-    return;
+function formatDate(dateStr){
+    return new Date(dateStr).toLocaleDateString("en-US", {
+        year: "numeric",
+        month: "long",
+        day: "numeric"
+    });
 }
 
 function formatTime(mins){
@@ -99,28 +79,69 @@ function formatTime(mins){
     return `${h12}:${String(m).padStart(2,'0')} ${ampm}`;
 }
 
-function block(msg){
-    document.getElementById("app").style.display="none";
-    const p=document.getElementById("paused");
-    p.style.display="block";
-    p.innerHTML=`<h1>We hope you had a wonderful time!</h1>
-                 <h3>Our check-out window is currently closed.</h3>
-                 <p>${msg}</p>`;
+// =======================
+// ACCESS CONTROL
+// =======================
+function checkAccess(){
+
+    const app = document.getElementById("app");
+    const paused = document.getElementById("paused");
+
+    app.style.display = "none";
+    paused.style.display = "none";
+
+    const sh = getShanghaiNow();
+    const today = getShanghaiDateString(sh);
+    const nowMinutes = getMinutes(sh);
+
+    // NOT TODAY
+    if(today !== event.date){
+        block(`Check-out will be available on ${formatDate(event.date)} from ${formatTime(event.start.hour*60+event.start.minute)} - ${formatTime(event.end.hour*60+event.end.minute)} (Shanghai Time).`);
+        return;
+    }
+
+    const start = event.start.hour*60 + event.start.minute;
+    const end = event.end.hour*60 + event.end.minute;
+
+    // INSIDE WINDOW → SHOW FORM
+    if(nowMinutes >= start && nowMinutes < end){
+        app.style.display = "block";
+        return;
+    }
+
+    // OUTSIDE WINDOW
+    block(`Available on ${formatDate(event.date)}, ${formatTime(start)} - ${formatTime(end)} (Shanghai Time).`);
 }
 
-// -----------------------
+// =======================
+// BLOCK UI
+// =======================
+function block(msg){
+    document.getElementById("app").style.display = "none";
+    const p = document.getElementById("paused");
+    p.style.display = "block";
+    p.innerHTML = `
+        <h1>We hope you had a wonderful time!</h1>
+        <h3>Our check-out window is currently closed.</h3>
+        <p>${msg}</p>
+    `;
+}
+
+// =======================
+// FORM SUBMIT (UTC)
+// =======================
 document.getElementById("form").addEventListener("submit", e=>{
     e.preventDefault();
 
-    const fname = fname.value.trim();
-    const lname = lname.value.trim();
+    const fname = document.getElementById("fname").value.trim();
+    const lname = document.getElementById("lname").value.trim();
 
     if(!fname || !lname){
         alert("Enter name");
         return;
     }
 
-    status.textContent = "Submitting...";
+    document.getElementById("status").textContent = "Submitting...";
 
     fetch(webhookURL,{
         method:"POST",
@@ -128,9 +149,9 @@ document.getElementById("form").addEventListener("submit", e=>{
         body: JSON.stringify({
             fname,
             lname,
-            day: currentEvent.day,
+            day: event.day,
             action: "check-out",
-            timestamp: new Date().toISOString() // ✅ UTC
+            timestamp: new Date().toISOString()
         })
     })
     .then(()=>{
@@ -138,11 +159,11 @@ document.getElementById("form").addEventListener("submit", e=>{
     })
     .catch(()=>{
         alert("Error. Try again.");
-        status.textContent="";
+        document.getElementById("status").textContent = "";
     });
 });
 
-// -----------------------
+// =======================
 checkAccess();
 setInterval(checkAccess, 30000);
 </script>
